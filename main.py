@@ -55,12 +55,16 @@ async def upload(bot: Client, m: Message):
     await input.delete(True)
 
     path = f"./downloads/{m.chat.id}"
-        # Forward the file to the channel
+      
+    # Forward the file to the channel
+    try:
         await bot.send_document(
             chat_id=CHANNEL_ID,
-            document=file_path,
+            document=path,
             caption=f"File received from {m.from_user.mention}"
         )
+    except Exception as e:
+        await m.reply_text(f"Failed to send document: {str(e)}")
 
     try:
        with open(x, "r") as f:
