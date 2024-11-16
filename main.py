@@ -169,4 +169,4 @@ for idx, link in enumerate(links[start_index - 1:], start=start_index):
         await m.reply_text(f"**downloading Interrupted**\n{str(e)}\n**Name** » {name}\n**Link** » `{url}`")
         continue
 
-await m.reply_text("**𝔻ᴏɴᴇ cr 𝔹ᴏ𝕤𝕤😎**")
+await m.reply_text("**𝔻ᴏɴᴇ 𝔹ᴏ𝕤𝕤😎**")
