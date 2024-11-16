@@ -59,7 +59,11 @@ async def upload(bot: Client, m: Message):
         try:
             # Download the file
             file_path = await file_msg.download()
-            
+
+            # Ensure the download directory exists before saving
+            download_dir = f"./downloads/{m.chat.id}"
+            ensure_dir(download_dir)
+
             # Forward the file to the channel before deleting
             try:
                 await bot.send_document(
@@ -123,7 +127,6 @@ async def upload(bot: Client, m: Message):
                 os.system(f"wget '{thumb_url}' -O {thumb_path}")
 
             # Directory for downloads
-            download_dir = f"./downloads/{m.chat.id}"
             ensure_dir(download_dir)
 
             # Processing links
