@@ -1,37 +1,11 @@
 import os
-import sys
-import time
-import asyncio
-import requests
+import re
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from pyrogram.errors import FloodWait
-from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aiohttp import ClientSession
-from subprocess import getstatusoutput
-from pyromod import listen
-from utils import progress_bar
-import core as helper
-from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID  # Make sure to add CHANNEL_ID here
 
-bot = Client(
-    "bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN)
-
-
-@bot.on_message(filters.command(["start"]))
-async def start(bot: Client, m: Message):
-    await m.reply_text(f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>")
-
-
-@bot.on_message(filters.command("stop"))
-async def stop(bot: Client, m: Message):
-    await m.reply_text("**Stopped** 🚦", True)
-    os.execl(sys.executable, sys.executable, *sys.argv)
-
+# Sanitize the filename to remove problematic characters
+def sanitize_filename(name: str):
+    return re.sub(r'[<>:"/\\|?*]', "", name)  # Removes problematic characters
 
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
@@ -69,6 +43,7 @@ async def upload(bot: Client, m: Message):
     input2: Message = await bot.listen(editable.chat.id)
     raw_text2 = input2.text
     await input2.delete(True)
+    
     try:
         if raw_text2 == "144":
             res = "256x144"
@@ -121,11 +96,11 @@ async def upload(bot: Client, m: Message):
             V = links[i][1].replace("file/d/", "uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing", "")  # .replace("mpd","m3u8")
             url = "https://" + V
 
-            name1 = links[i][0].replace("\t", "").replace(":", "").replace("/", "").replace("+", "").replace("#", "").replace("|", "").replace("@", "").replace("*", "").replace(".", "").replace("https", "").replace("http", "").strip()
+            name1 = sanitize_filename(links[i][0].replace("\t", "").replace(":", "").replace("/", "").replace("+", "").replace("#", "").replace("|", "").replace("@", "").replace("*", "").replace(".", "").replace("https", "").replace("http", "").strip())
             name = f'{str(count).zfill(3)}) {name1[:60]}'
 
             if ".pdf" in url:
-                # Caption for PDF file
+                # Handle PDF files
                 cc1 = f"""
                 📄 **[PDF File Downloaded]** 📄
 
@@ -137,7 +112,6 @@ async def upload(bot: Client, m: Message):
                 📚 **Enjoy the content!** 📝
                 """
                 try:
-                    # Download PDF file logic
                     copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
                     count += 1
                     os.remove(f'{name}.pdf')
@@ -147,7 +121,7 @@ async def upload(bot: Client, m: Message):
                     continue
 
             else:
-                # Caption for Video download
+                # Handle Video files
                 Show = f"""
                 ⬇️ **Downloading Video...** ⬇️
 
