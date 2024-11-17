@@ -1,10 +1,8 @@
 import os
-import re
 import time
 import requests
 import validators
 from subprocess import getstatusoutput
-
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
@@ -19,13 +17,14 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-# Helper Function: Create directories if not present
+# Helper Functions
 def ensure_dir(path):
+    """Create directories if not present."""
     if not os.path.exists(path):
         os.makedirs(path)
 
-# Helper Function: Validate URLs
 def validate_url(url):
+    """Validate URLs."""
     return validators.url(url)
 
 # Global state to track user responses
@@ -55,7 +54,6 @@ async def process_file(bot: Client, m: Message):
     if m.chat.id not in user_states or user_states[m.chat.id].get("state") != "waiting_for_file":
         return
 
-    # Download the file
     file_path = await m.download()
     user_states[m.chat.id] = {
         "state": "waiting_for_start_index",
@@ -117,9 +115,9 @@ async def handle_caption(bot: Client, m: Message):
         "caption": caption
     })
 
-    # Start processing the links
     await process_links(bot, m)
 
+# Process Links
 async def process_links(bot: Client, m: Message):
     state = user_states[m.chat.id]
     file_path = state["file_path"]
@@ -127,13 +125,12 @@ async def process_links(bot: Client, m: Message):
     resolution = state["resolution"]
     caption = state["caption"]
 
-    # Read and process the file
     with open(file_path, "r") as f:
         links = [line.strip() for line in f.readlines() if line.strip()]
 
     if not links:
         await m.reply_text("The file is empty or invalid. Please try again.")
-        os.remove(file_path)  # Clean up
+        os.remove(file_path)
         del user_states[m.chat.id]
         return
 
@@ -148,7 +145,6 @@ async def process_links(bot: Client, m: Message):
                 continue
 
             if link.endswith(".pdf"):
-                # Handle PDF
                 pdf_path = os.path.join(download_dir, f"{count:03d}.pdf")
                 response = requests.get(link)
 
@@ -160,7 +156,6 @@ async def process_links(bot: Client, m: Message):
                 else:
                     await m.reply_text(f"❌ Failed to download PDF {count}: {link}")
             else:
-                # Handle Video
                 ytf = f"b[height<={resolution}][ext=mp4]/bv[height<={resolution}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
                 video_name = os.path.join(download_dir, f"{count:03d}.mp4")
                 cmd = f'yt-dlp -f "{ytf}" "{link}" -o "{video_name}"'
@@ -180,7 +175,7 @@ async def process_links(bot: Client, m: Message):
             continue
 
     await m.reply_text("All tasks completed successfully! 🎉")
-    os.remove(file_path)  # Clean up
+    os.remove(file_path)
     del user_states[m.chat.id]
 
 # Start the bot
