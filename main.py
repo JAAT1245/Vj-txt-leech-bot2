@@ -1,182 +1,150 @@
 import os
 import sys
-import time
 import asyncio
-import requests
+import re
+from aiohttp import ClientSession
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from pyrogram.errors import FloodWait
-from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aiohttp import ClientSession
 from subprocess import getstatusoutput
-from pyromod import listen
-from utils import progress_bar
-import core as helper
-from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID  # Make sure to add CHANNEL_ID here
+from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID  # Ensure these variables are in your vars.py
 
-# Define the bot object first
+# Define the bot object
 bot = Client(
     "bot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN)
+    bot_token=BOT_TOKEN
+)
 
+# Helper function to sanitize filenames
+def sanitize_filename(name):
+    return re.sub(r'[\\/*?:"<>|]', "", name)
 
-# Now define your command handlers after defining the bot
+# Function to download video
+async def download_video(url, name):
+    try:
+        async with ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    with open(name, 'wb') as f:
+                        f.write(await response.read())
+                    return name
+                else:
+                    return f"Error: Unable to download {url}, Status: {response.status}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
+# Command: /start
 @bot.on_message(filters.command(["start"]))
 async def start(bot: Client, m: Message):
-    await m.reply_text(f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>")
+    await m.reply_text(
+        f"Hello {m.from_user.mention} 👋\n\n"
+        "I am a bot that can download links from your **.TXT** file and upload them to Telegram.\n\n"
+        "Use /upload to start uploading or /stop to stop any ongoing task."
+    )
 
-
+# Command: /stop
 @bot.on_message(filters.command("stop"))
 async def stop(bot: Client, m: Message):
     await m.reply_text("**Stopped** 🚦", True)
     os.execl(sys.executable, sys.executable, *sys.argv)
 
-
+# Command: /upload
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
-    editable = await m.reply_text('𝕤ᴇɴᴅ ᴛxᴛ ғɪʟᴇ ⚡️')
-    input: Message = await bot.listen(editable.chat.id)
-    x = await input.download()
-    await input.delete(True)
-
-    path = f"./downloads/{m.chat.id}"
+    editable = await m.reply_text("Send a **.TXT** file containing the download links.")
+    input_file: Message = await bot.listen(editable.chat.id)
+    file_path = await input_file.download()
+    await input_file.delete()
 
     try:
-        with open(x, "r") as f:
+        with open(file_path, "r") as f:
             content = f.read()
-        content = content.split("\n")
-        links = []
-        for i in content:
-            links.append(i.split("://", 1))
-        os.remove(x)
-    except:
-        await m.reply_text("**Invalid file input.**")
-        os.remove(x)
+        links = [line.strip() for line in content.split("\n") if line.strip()]
+        os.remove(file_path)
+    except Exception as e:
+        await m.reply_text(f"**Error reading the file:** {str(e)}")
         return
 
-    await editable.edit(f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**")
-    input0: Message = await bot.listen(editable.chat.id)
-    raw_text = input0.text
-    await input0.delete(True)
+    await editable.edit(f"**Total links found:** {len(links)}\n\nSend the starting number (default is 1):")
+    input_start: Message = await bot.listen(editable.chat.id)
+    start_index = int(input_start.text.strip()) - 1
+    await input_start.delete()
 
-    await editable.edit("**Now Please Send Me Your Batch Name**")
-    input1: Message = await bot.listen(editable.chat.id)
-    raw_text0 = input1.text
-    await input1.delete(True)
+    await editable.edit("Send the batch name:")
+    input_batch: Message = await bot.listen(editable.chat.id)
+    batch_name = input_batch.text.strip()
+    await input_batch.delete()
 
-    await editable.edit("**𝔼ɴᴛᴇʀ ʀᴇ𝕤ᴏʟᴜᴛɪᴏɴ📸**\n144,240,360,480,720,1080 please choose quality")
-    input2: Message = await bot.listen(editable.chat.id)
-    raw_text2 = input2.text
-    await input2.delete(True)
-    
-    try:
-        if raw_text2 == "144":
-            res = "256x144"
-        elif raw_text2 == "240":
-            res = "426x240"
-        elif raw_text2 == "360":
-            res = "640x360"
-        elif raw_text2 == "480":
-            res = "854x480"
-        elif raw_text2 == "720":
-            res = "1280x720"
-        elif raw_text2 == "1080":
-            res = "1920x1080"
-        else:
-            res = "UN"
-    except Exception:
-        res = "UN"
+    await editable.edit("Enter the resolution (e.g., 144, 240, 360, 480, 720, 1080):")
+    input_res: Message = await bot.listen(editable.chat.id)
+    resolution = input_res.text.strip()
+    resolutions = {
+        "144": "256x144", "240": "426x240", "360": "640x360",
+        "480": "854x480", "720": "1280x720", "1080": "1920x1080"
+    }
+    res = resolutions.get(resolution, "UN")
+    await input_res.delete()
 
-    await editable.edit("Now Enter A Caption to add caption on your uploaded file")
-    input3: Message = await bot.listen(editable.chat.id)
-    raw_text3 = input3.text
-    await input3.delete(True)
-    highlighter = f"️ ⁪⁬⁮⁮⁮"
-    if raw_text3 == 'Robin':
-        MR = highlighter
-    else:
-        MR = raw_text3
+    await editable.edit("Send the thumbnail URL or type 'no' to skip:")
+    input_thumb: Message = await bot.listen(editable.chat.id)
+    thumb_url = input_thumb.text.strip()
+    await input_thumb.delete()
+    thumb = None
+    if thumb_url.startswith("http"):
+        getstatusoutput(f"wget '{thumb_url}' -O 'thumb.jpg'")
+        thumb = "thumb.jpg"
 
-    await editable.edit("Now send the Thumb url/nEg » https://graph.org/file/ce1723991756e48c35aa1.jpg \n Or if don't want thumbnail send = no")
-    input6 = message = await bot.listen(editable.chat.id)
-    raw_text6 = input6.text
-    await input6.delete(True)
     await editable.delete()
 
-    thumb = input6.text
-    if thumb.startswith("http://") or thumb.startswith("https://"):
-        getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
-        thumb = "thumb.jpg"
-    else:
-        thumb == "no"
-
-    if len(links) == 1:
-        count = 1
-    else:
-        count = int(raw_text)
-
-    try:
-        for i in range(count - 1, len(links)):
-
-            V = links[i][1].replace("file/d/", "uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing", "")  # .replace("mpd","m3u8")
-            url = "https://" + V
-
-            name1 = sanitize_filename(links[i][0].replace("\t", "").replace(":", "").replace("/", "").replace("+", "").replace("#", "").replace("|", "").replace("@", "").replace("*", "").replace(".", "").replace("https", "").replace("http", "").strip())
-            name = f'{str(count).zfill(3)}) {name1[:60]}'
-
-            if ".pdf" in url:
-                # Handle PDF files
-                cc1 = f"""
-                📄 **[PDF File Downloaded]** 📄
-
-                📜 **File Name:** `{str(count).zfill(3)}) {name1[:60]}`
-                📂 **Batch:** **{raw_text0}**
-
-                🔗 **URL:** {url}
-
-                📚 **Enjoy the content!** 📝
-                """
-                try:
-                    copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
-                    count += 1
-                    os.remove(f'{name}.pdf')
-                except FloodWait as e:
-                    await m.reply_text(str(e))
-                    time.sleep(e.x)
-                    continue
-
+    for i in range(start_index, len(links)):
+        link = links[i]
+        file_name = sanitize_filename(link[:60])
+        display_name = f"{str(i + 1).zfill(3)}_{file_name}"
+        try:
+            if link.endswith(".pdf"):
+                # Stylish caption for PDF files
+                caption_pdf = (
+                    f"📄 **PDF File**\n\n"
+                    f"📚 **Batch Name:** {batch_name}\n"
+                    f"🔢 **Serial:** {str(i + 1).zfill(3)}\n\n"
+                    f"✨ **Join @targetallcourse**"
+                )
+                await bot.send_document(
+                    chat_id=m.chat.id,
+                    document=link,
+                    caption=caption_pdf
+                )
             else:
-                # Handle Video files
-                Show = f"""
-                ⬇️ **Downloading Video...** ⬇️
+                # Stylish caption for Video files
+                caption_video = (
+                    f"🎥 **Video File**\n\n"
+                    f"📚 **Batch Name:** {batch_name}\n"
+                    f"🎞 **Resolution:** {res}\n"
+                    f"🔢 **Serial:** {str(i + 1).zfill(3)}\n\n"
+                    f"✨ **Join @targetallcourse**"
+                )
+                video_path = await download_video(link, f"{display_name}.mp4")
+                if os.path.exists(video_path):
+                    await bot.send_video(
+                        chat_id=m.chat.id,
+                        video=video_path,
+                        caption=caption_video,
+                        thumb=thumb,
+                        supports_streaming=True
+                    )
+                    os.remove(video_path)
+                else:
+                    await m.reply_text(f"Failed to download: {link}")
+        except Exception as e:
+            await m.reply_text(f"Error processing link {link}: {str(e)}")
+            continue
 
-                📝 **Name:** `{name}`
-                ❄️ **Quality:** `{raw_text2}`
+    if thumb and os.path.exists(thumb):
+        os.remove(thumb)
 
-                🔗 **URL:** `{url}`
-                """
-                prog = await m.reply_text(Show)
-                res_file = await helper.download_video(url, cmd, name)
-                filename = res_file
-                await prog.delete(True)
-                await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
-                count += 1
-                time.sleep(1)
+    await bot.send_message(m.chat.id, "**Upload complete!**")
+    await bot.send_document(CHANNEL_ID, document=file_path, caption="Original .TXT file with the links.")
 
-    except Exception as e:
-        await m.reply_text(e)
-
-    # After processing, send the text file to the channel
-    try:
-        await bot.send_document(CHANNEL_ID, document=x, caption="Here is the original **.txt** file with the links!")
-        await m.reply_text("**𝔻ᴏɴᴇ 𝔹ᴏ𝕤𝕤😎. Your text file has been sent to the channel!**")
-    except Exception as e:
-        await m.reply_text(f"Error sending the file to the channel: {str(e)}")
-
-
-# Now run the bot
+# Run the bot
 bot.run()
