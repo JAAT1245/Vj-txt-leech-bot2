@@ -1,5 +1,4 @@
 import os
-import sys
 import re
 from pyrogram import Client, filters
 from pyrogram.types import Message
@@ -18,21 +17,7 @@ bot = Client(
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
-# Function to download video
-async def download_video(url, name):
-    try:
-        async with ClientSession() as session:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    with open(name, 'wb') as f:
-                        f.write(await response.read())
-                    return name
-                else:
-                    return f"Error: Unable to download {url}, Status: {response.status}"
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-# Global variables to track states
+# Global dictionary to manage user states
 user_data = {}
 
 # Command: /start
@@ -40,8 +25,8 @@ user_data = {}
 async def start(bot: Client, m: Message):
     await m.reply_text(
         f"Hello {m.from_user.mention} 👋\n\n"
-        "I am a bot that can download links from your **.TXT** file and upload them to Telegram.\n\n"
-        "Use /upload to start uploading or /stop to stop any ongoing task,😊👀❣️🤑 bot 💌 Deploy by cr choudhary."
+        "I am a bot that can process links from your `.TXT` file and upload them to Telegram.\n\n"
+        "Use /upload to start uploading or /stop to stop any ongoing task."
     )
 
 # Command: /stop
@@ -53,7 +38,7 @@ async def stop(bot: Client, m: Message):
 # Command: /upload
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
-    await m.reply_text("Send a **.TXT** file containing the download links.")
+    await m.reply_text("Send a `.TXT` file containing the download links.")
 
 # Handling .txt file upload
 @bot.on_message(filters.document)
@@ -71,7 +56,7 @@ async def handle_document(bot: Client, m: Message):
     else:
         await m.reply_text("Please send a valid `.txt` file.")
 
-# Handling starting number input
+# Handling user input
 @bot.on_message(filters.text & filters.reply)
 async def handle_input(bot: Client, m: Message):
     chat_id = m.chat.id
@@ -79,29 +64,33 @@ async def handle_input(bot: Client, m: Message):
         await m.reply_text("Please send a `.txt` file first using /upload.")
         return
 
-    if "start_index" not in user_data[chat_id]:
+    data = user_data[chat_id]
+    if "start_index" not in data:
         try:
-            user_data[chat_id]["start_index"] = int(m.text.strip()) - 1
+            start_index = int(m.text.strip()) - 1
+            if start_index < 0 or start_index >= len(data["links"]):
+                raise ValueError("Invalid starting index.")
+            data["start_index"] = start_index
             await m.reply_text("Send the batch name:")
         except ValueError:
-            await m.reply_text("Invalid number. Please try again.")
-    elif "batch_name" not in user_data[chat_id]:
-        user_data[chat_id]["batch_name"] = m.text.strip()
+            await m.reply_text("Invalid number. Please send a valid starting number.")
+    elif "batch_name" not in data:
+        data["batch_name"] = m.text.strip()
         await m.reply_text("Enter the resolution (e.g., 144, 240, 360, 480, 720, 1080):")
-    elif "resolution" not in user_data[chat_id]:
+    elif "resolution" not in data:
         resolutions = {
             "144": "256x144", "240": "426x240", "360": "640x360",
             "480": "854x480", "720": "1280x720", "1080": "1920x1080"
         }
-        user_data[chat_id]["resolution"] = resolutions.get(m.text.strip(), "UN")
+        data["resolution"] = resolutions.get(m.text.strip(), "UN")
         await m.reply_text("Send the thumbnail URL or type 'no' to skip:")
-    elif "thumb" not in user_data[chat_id]:
+    elif "thumb" not in data:
         thumb_url = m.text.strip()
         if thumb_url.startswith("http"):
             getstatusoutput(f"wget '{thumb_url}' -O 'thumb.jpg'")
-            user_data[chat_id]["thumb"] = "thumb.jpg"
+            data["thumb"] = "thumb.jpg"
         else:
-            user_data[chat_id]["thumb"] = None
+            data["thumb"] = None
         await process_links(bot, m)
 
 async def process_links(bot: Client, m: Message):
