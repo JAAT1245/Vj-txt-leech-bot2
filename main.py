@@ -1,29 +1,32 @@
 import os
 import re
-import sys
 import time
 import requests
+import validators
 from subprocess import getstatusoutput
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from vars import API_ID, API_HASH, BOT_TOKEN
 
-# Bot Configuration
-CHANNEL_ID = "@Hub_formate"  # Replace with your channel ID or username
+from vars import API_ID, API_HASH, BOT_TOKEN
+CHANNEL_ID = "@Hub_formate"  # Replace with your channel username or ID
 
 # Initialize the bot
 bot = Client(
-    "bot",
+    "download_bot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
 )
 
-# Helper Function to create directories if not present
+# Helper Function: Create directories if not present
 def ensure_dir(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
+# Helper Function: Validate URLs
+def validate_url(url):
+    return validators.url(url)
 
 # Global state to track user responses
 user_states = {}
@@ -140,6 +143,10 @@ async def process_links(bot: Client, m: Message):
     count = start_index
     for idx, link in enumerate(links[start_index - 1:], start=start_index):
         try:
+            if not validate_url(link):
+                await m.reply_text(f"❌ Invalid URL: {link}")
+                continue
+
             if link.endswith(".pdf"):
                 # Handle PDF
                 pdf_path = os.path.join(download_dir, f"{count:03d}.pdf")
