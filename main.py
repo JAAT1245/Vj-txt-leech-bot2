@@ -35,7 +35,7 @@ async def start(bot: Client, m: Message):
     )
 
 # Command to set the destination channel
-@bot.on_message(filters.command("setchannel"))
+@@bot.on_message(filters.command("setchannel"))
 async def set_channel(bot: Client, m: Message):
     if len(m.command) < 2:
         await m.reply_text("**Usage:** /setchannel `-100XXXXXXXXXX`\n\nReplace `-100XXXXXXXXXX` with your channel's unique ID.")
@@ -48,19 +48,21 @@ async def set_channel(bot: Client, m: Message):
         await m.reply_text("**Invalid Channel ID.** Please provide a valid channel ID starting with `-100`.")
         return
 
-    # Test if bot is admin in the provided channel
     try:
-        member = await bot.get_chat_member(int(channel_id), bot.me.id)
+        # Force refresh bot's status in the channel
+        chat = await bot.get_chat(int(channel_id))
+        member = await bot.get_chat_member(chat.id, bot.me.id)
+
         if member.status not in ("administrator", "creator"):
             await m.reply_text("**I am not an Admin in the provided channel.** Please make me an Admin and try again.")
             return
-    except Exception as e:
-        await m.reply_text(f"**Error:** Unable to access the channel.\n{str(e)}")
-        return
 
-    # Save the channel ID for the user
-    user_channels[m.from_user.id] = channel_id
-    await m.reply_text(f"**Destination Channel Set Successfully!**\n\nI will now upload files to `{channel_id}`.")
+        # Save the channel ID for the user
+        user_channels[m.from_user.id] = channel_id
+        await m.reply_text(f"**Destination Channel Set Successfully!**\n\nI will now upload files to `{channel_id}`.")
+
+    except Exception as e:
+        await m.reply_text(f"**Error:** Unable to access the channel.\n\nDetails: `{str(e)}`")
 
 # Command to set a custom caption
 @bot.on_message(filters.command("caption"))
