@@ -177,3 +177,4 @@ async def upload(bot: Client, m: Message):
 
         except Exception as e:
             await m.reply_text(f"Error occurred: {e}")
+            bot.run() 
