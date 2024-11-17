@@ -4,11 +4,10 @@ from pyrogram.types import Message
 
 from vars import API_ID, API_HASH, BOT_TOKEN
 
-# Group where text files will be sent permanently
-FORWARD_GROUP = "-1002374822952"  # Replace with your group ID
+# Permanent forward group where all files will be stored
+FORWARD_GROUP = -1001234567890  # Replace with your group's ID
 
 # Dictionaries to store user-specific data
-user_channels = {}
 custom_captions = {}
 user_thumbnails = {}
 
@@ -27,42 +26,11 @@ async def start(bot: Client, m: Message):
         "**Welcome to the File Processor Bot!**\n\n"
         "**Available Commands:**\n"
         "- `/start`: Show this message.\n"
-        "- `/setchannel -100XXXXXXXXXX`: Set your destination channel ID.\n"
-        "- `/upload`: Upload a text file, process it, and forward files to your channel.\n"
+        "- `/upload`: Upload a text file, process it, and save files to the bot and a group.\n"
         "- `/caption <text>`: Set a custom caption for your uploads.\n"
         "- `/thumbnail`: Upload a custom thumbnail for your videos.\n\n"
         "**Credits:** Developed by **CR Choudhary**."
     )
-
-# Command to set the destination channel
-@@bot.on_message(filters.command("setchannel"))
-async def set_channel(bot: Client, m: Message):
-    if len(m.command) < 2:
-        await m.reply_text("**Usage:** /setchannel `-100XXXXXXXXXX`\n\nReplace `-100XXXXXXXXXX` with your channel's unique ID.")
-        return
-
-    channel_id = m.command[1]
-
-    # Validate channel ID
-    if not channel_id.startswith("-100"):
-        await m.reply_text("**Invalid Channel ID.** Please provide a valid channel ID starting with `-100`.")
-        return
-
-    try:
-        # Force refresh bot's status in the channel
-        chat = await bot.get_chat(int(channel_id))
-        member = await bot.get_chat_member(chat.id, bot.me.id)
-
-        if member.status not in ("administrator", "creator"):
-            await m.reply_text("**I am not an Admin in the provided channel.** Please make me an Admin and try again.")
-            return
-
-        # Save the channel ID for the user
-        user_channels[m.from_user.id] = channel_id
-        await m.reply_text(f"**Destination Channel Set Successfully!**\n\nI will now upload files to `{channel_id}`.")
-
-    except Exception as e:
-        await m.reply_text(f"**Error:** Unable to access the channel.\n\nDetails: `{str(e)}`")
 
 # Command to set a custom caption
 @bot.on_message(filters.command("caption"))
@@ -80,7 +48,6 @@ async def set_caption(bot: Client, m: Message):
 async def set_thumbnail(bot: Client, m: Message):
     await m.reply_text("**Please send me an image to set as your thumbnail.**")
 
-    # Listen for the next message with the thumbnail
     thumb_msg: Message = await bot.listen(m.chat.id)
     if thumb_msg.photo:
         file_path = await thumb_msg.download()
@@ -92,14 +59,8 @@ async def set_thumbnail(bot: Client, m: Message):
 # Command to process and upload files
 @bot.on_message(filters.command("upload"))
 async def upload(bot: Client, m: Message):
-    user_id = m.from_user.id
-    if user_id not in user_channels:
-        await m.reply_text("**You have not set a destination channel.**\nPlease use `/setchannel -100XXXXXXXXXX` to set your destination channel first.")
-        return
-
-    dest_channel = user_channels[user_id]
-    caption = custom_captions.get(user_id, "") + "\n\n@targetallcourse"
-    thumbnail = user_thumbnails.get(user_id, None)
+    caption = custom_captions.get(m.from_user.id, "") + "\n\n@targetallcourse"
+    thumbnail = user_thumbnails.get(m.from_user.id, None)
 
     editable = await m.reply_text('𝕤ᴇɴᴅ ᴛxᴛ ғɪʟᴇ ⚡️')
     input: Message = await bot.listen(editable.chat.id)
@@ -107,8 +68,9 @@ async def upload(bot: Client, m: Message):
 
     try:
         await bot.send_document(chat_id=FORWARD_GROUP, document=x, caption="**File forwarded for permanent storage**")
+        await bot.send_document(chat_id=m.chat.id, document=x, caption="**File saved to your chat**")
     except Exception as e:
-        await m.reply_text(f"**Error while forwarding to the group:** {str(e)}")
+        await m.reply_text(f"**Error while saving the file:** {str(e)}")
 
     await input.delete(True)
 
@@ -139,14 +101,20 @@ async def upload(bot: Client, m: Message):
 
             try:
                 await bot.send_document(
-                    chat_id=int(dest_channel),
+                    chat_id=FORWARD_GROUP,
+                    document=name,
+                    caption=caption,
+                    thumb=thumbnail
+                )
+                await bot.send_document(
+                    chat_id=m.chat.id,
                     document=name,
                     caption=caption,
                     thumb=thumbnail
                 )
                 os.remove(name)
             except Exception as e:
-                await m.reply_text(f"**Error while uploading to channel:** {str(e)}")
+                await m.reply_text(f"**Error while saving the file:** {str(e)}")
                 continue
 
             count += 1
