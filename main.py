@@ -1,7 +1,6 @@
 import os
 import re
 import sys
-import time
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from subprocess import getstatusoutput
@@ -71,6 +70,7 @@ async def handle_input(bot: Client, m: Message):
         return
 
     data = user_data[chat_id]
+    
     if "start_index" not in data:
         try:
             start_index = int(m.text.strip()) - 1
@@ -168,9 +168,10 @@ async def process_links(bot: Client, m: Message):
     del user_data[chat_id]
 
 async def download_video(url, file_name):
-    # This is a placeholder for downloading the video file
-    # Implement the video downloading logic here
+    # Placeholder function for downloading videos
+    # Implement your download logic here
     return file_name
 
 # Run the bot
+print("Bot is running..😘😘.")
 bot.run()
