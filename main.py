@@ -1,194 +1,133 @@
 import os
-import time
-import requests
-import validators
-from subprocess import getstatusoutput
+import sys
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
 from vars import API_ID, API_HASH, BOT_TOKEN
-CHANNEL_ID = "@Hub_formate"  # Replace with your channel username or ID
+
+# Group where text files will be sent permanently
+FORWARD_GROUP = "-1002374822952"  # Replace with your group ID
+
+# Dictionary to store user-specific destination channels
+user_channels = {}
 
 # Initialize the bot
 bot = Client(
-    "download_bot",
+    "bot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN
 )
 
-# Helper Functions
-def ensure_dir(path):
-    """Create directories if not present."""
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-def validate_url(url):
-    """Validate URLs."""
-    return validators.url(url)
-
-# Global state to track user responses
-user_states = {}
-
-# Command: Start
-@bot.on_message(filters.command(["start"]))
+# /start command
+@bot.on_message(filters.command("start"))
 async def start(bot: Client, m: Message):
     await m.reply_text(
-        f"👋 Hello {m.from_user.mention},\n\n"
-        "I am a bot for processing .txt files containing download links. "
-        "I can handle both videos and PDFs.\n\n"
-        "Steps:\n1. Use /upload to send a .txt file.\n"
-        "2. Provide starting link number and resolution.\n"
-        "3. I will process the links and download the content.\n\n"
-        "Created by CR Choudhary."
+        "**Welcome to the File Processor Bot!**\n\n"
+        "**Available Commands:**\n"
+        "- `/start`: Show this message.\n"
+        "- `/setchannel -100XXXXXXXXXX`: Set your destination channel ID.\n"
+        "- `/upload`: Upload a text file, process it, and forward videos to your channel.\n\n"
+        "**Credits:** Developed by **CR Choudhary**."
     )
 
-# Command: Upload
-@bot.on_message(filters.command(["upload"]))
-async def upload(bot: Client, m: Message):
-    await m.reply_text("Please send your .txt file 📄🗃️.")
-    user_states[m.chat.id] = {"state": "waiting_for_file"}
-    print(f"User state updated: {user_states[m.chat.id]}")  # Debugging
-
-# Handle File Upload
-@bot.on_message(filters.document & filters.private)
-async def process_file(bot: Client, m: Message):
-    if m.chat.id not in user_states or user_states[m.chat.id].get("state") != "waiting_for_file":
+# Command to set the destination channel
+@bot.on_message(filters.command("setchannel"))
+async def set_channel(bot: Client, m: Message):
+    if len(m.command) < 2:
+        await m.reply_text("**Usage:** /setchannel `-100XXXXXXXXXX`\n\nReplace `-100XXXXXXXXXX` with your channel's unique ID.")
         return
 
+    channel_id = m.command[1]
+
+    # Validate channel ID
+    if not channel_id.startswith("-100"):
+        await m.reply_text("**Invalid Channel ID.** Please provide a valid channel ID starting with `-100`.")
+        return
+
+    # Test if bot is admin in the provided channel
     try:
-        file_path = await m.download()
-        user_states[m.chat.id] = {
-            "state": "waiting_for_start_index",
-            "file_path": file_path
-        }
-        await m.reply_text("🔗 File received. Now send the starting link number (default is 1):")
-        print(f"File received and saved: {file_path}")  # Debugging
-    except Exception as e:
-        await m.reply_text(f"Error downloading file: {e}")
-
-# Handle Start Index
-@bot.on_message(filters.text & filters.private)
-async def handle_start_index(bot: Client, m: Message):
-    if m.chat.id not in user_states or user_states[m.chat.id].get("state") != "waiting_for_start_index":
-        return
-
-    try:
-        start_index = int(m.text.strip()) if m.text.strip().isdigit() else 1
-        user_states[m.chat.id].update({
-            "state": "waiting_for_resolution",
-            "start_index": start_index
-        })
-        await m.reply_text("Enter video resolution (144, 240, 360, 480, 720, 1080):")
-    except ValueError:
-        await m.reply_text("Invalid input. Please send a valid number for the starting link index.")
-
-# Handle Resolution
-@bot.on_message(filters.text & filters.private)
-async def handle_resolution(bot: Client, m: Message):
-    if m.chat.id not in user_states or user_states[m.chat.id].get("state") != "waiting_for_resolution":
-        return
-
-    res_map = {
-        "144": "256x144",
-        "240": "426x240",
-        "360": "640x360",
-        "480": "854x480",
-        "720": "1280x720",
-        "1080": "1920x1080"
-    }
-
-    resolution = m.text.strip()
-    if resolution not in res_map:
-        await m.reply_text("Invalid resolution. Please enter one of: 144, 240, 360, 480, 720, 1080.")
-        return
-
-    user_states[m.chat.id].update({
-        "state": "waiting_for_caption",
-        "resolution": res_map[resolution]
-    })
-    await m.reply_text("Resolution accepted. Enter a caption for your uploaded files:")
-
-# Handle Caption
-@bot.on_message(filters.text & filters.private)
-async def handle_caption(bot: Client, m: Message):
-    if m.chat.id not in user_states or user_states[m.chat.id].get("state") != "waiting_for_caption":
-        return
-
-    caption = m.text.strip()
-    user_states[m.chat.id].update({
-        "state": "processing_links",
-        "caption": caption
-    })
-
-    await process_links(bot, m)
-
-# Process Links
-async def process_links(bot: Client, m: Message):
-    try:
-        state = user_states[m.chat.id]
-        file_path = state["file_path"]
-        start_index = state["start_index"]
-        resolution = state["resolution"]
-        caption = state["caption"]
-
-        with open(file_path, "r") as f:
-            links = [line.strip() for line in f.readlines() if line.strip()]
-
-        if not links:
-            await m.reply_text("The file is empty or invalid. Please try again.")
-            os.remove(file_path)
-            del user_states[m.chat.id]
+        member = await bot.get_chat_member(int(channel_id), bot.me.id)
+        if member.status not in ("administrator", "creator"):
+            await m.reply_text("**I am not an Admin in the provided channel.** Please make me an Admin and try again.")
             return
+    except Exception as e:
+        await m.reply_text(f"**Error:** Unable to access the channel.\n{str(e)}")
+        return
 
-        download_dir = f"./downloads/{m.chat.id}"
-        ensure_dir(download_dir)
+    # Save the channel ID for the user
+    user_channels[m.from_user.id] = channel_id
+    await m.reply_text(f"**Destination Channel Set Successfully!**\n\nI will now upload files to `{channel_id}`.")
 
-        count = start_index
-        for idx, link in enumerate(links[start_index - 1:], start=start_index):
+# Command to process and upload files
+@bot.on_message(filters.command("upload"))
+async def upload(bot: Client, m: Message):
+    # Check if user has set a destination channel
+    user_id = m.from_user.id
+    if user_id not in user_channels:
+        await m.reply_text("**You have not set a destination channel.**\nPlease use `/setchannel -100XXXXXXXXXX` to set your destination channel first.")
+        return
+
+    dest_channel = user_channels[user_id]
+
+    editable = await m.reply_text('𝕤ᴇɴᴅ ᴛxᴛ ғɪʟᴇ ⚡️')
+    input: Message = await bot.listen(editable.chat.id)
+    x = await input.download()
+
+    # Forward the file to the permanent group
+    try:
+        await bot.send_document(chat_id=FORWARD_GROUP, document=x, caption="**File forwarded for permanent storage**")
+    except Exception as e:
+        await m.reply_text(f"**Error while forwarding to the group:** {str(e)}")
+
+    await input.delete(True)
+
+    try:
+        # Process the file and extract links
+        with open(x, "r") as f:
+            content = f.read()
+        content = content.split("\n")
+        links = [line.strip() for line in content if line.strip()]
+        os.remove(x)  # Delete file after processing
+    except Exception as e:
+        await m.reply_text(f"**Invalid file input:** {str(e)}")
+        os.remove(x)
+        return
+
+    await editable.edit(f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**")
+    input0: Message = await bot.listen(editable.chat.id)
+    raw_text = input0.text
+    await input0.delete(True)
+
+    count = int(raw_text)
+
+    # Loop through links and upload files
+    try:
+        for i in range(count - 1, len(links)):
+            url = links[i]
+
+            # Set the output file name
+            name = f'{str(count).zfill(3)}.mp4'
+
+            # Download video or file
+            cmd = f'yt-dlp -o "{name}" "{url}"'
+            os.system(cmd)
+
+            # Send to user's destination channel
             try:
-                if not validate_url(link):
-                    await m.reply_text(f"❌ Invalid URL: {link}")
-                    continue
-
-                if link.endswith(".pdf"):
-                    pdf_path = os.path.join(download_dir, f"{count:03d}.pdf")
-                    response = requests.get(link)
-
-                    if response.status_code == 200:
-                        with open(pdf_path, "wb") as pdf_file:
-                            pdf_file.write(response.content)
-                        await bot.send_document(m.chat.id, pdf_path, caption=f"📄 PDF {count}: {caption},join @targetallcourse")
-                        os.remove(pdf_path)
-                    else:
-                        await m.reply_text(f"❌ Failed to download PDF {count}: {link}")
-                else:
-                    ytf = f"b[height<={resolution}][ext=mp4]/bv[height<={resolution}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
-                    video_name = os.path.join(download_dir, f"{count:03d}.mp4")
-                    cmd = f'yt-dlp -f "{ytf}" "{link}" -o "{video_name}"'
-                    status, output = getstatusoutput(cmd)
-
-                    if status == 0:
-                        await bot.send_video(m.chat.id, video_name, caption=f"🎥 Video {count}: {caption},join @targetallcourse")
-                        os.remove(video_name)
-                    else:
-                        await m.reply_text(f"❌ Failed to download video {count}: {link}\nError: {output}")
-
-                count += 1
-                time.sleep(1)
-
+                await bot.send_document(chat_id=int(dest_channel), document=name, caption=f"**Uploaded File:** {name}")
+                os.remove(name)
             except Exception as e:
-                await m.reply_text(f"Error processing link {count}:\n{link}\nError: {e}")
+                await m.reply_text(f"**Error while uploading to channel:** {str(e)}")
                 continue
 
-        await m.reply_text("All tasks completed successfully! 🎉")
-        os.remove(file_path)
-        del user_states[m.chat.id]
-
+            count += 1
     except Exception as e:
-        await m.reply_text(f"An error occurred: {e}")
+        await m.reply_text(f"**Error while processing links:** {str(e)}")
+
+    await m.reply_text("**𝔻ᴏɴᴇ 𝔹ᴏ𝕤𝕤😎**")
 
 # Start the bot
 if __name__ == "__main__":
-    print("Bot is running, deployed by CR Choudhary...")
+    print("Bot is running...")
     bot.run()
