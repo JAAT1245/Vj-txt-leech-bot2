@@ -37,7 +37,7 @@ async def start(bot: Client, m: Message):
         f"👋 Hello {m.from_user.mention},\n\n"
         "I am a bot for processing .txt files containing download links. "
         "I can handle both videos and PDFs.\n\n"
-        "Steps:\n1. Use /upload to send a .txt file.\n"
+        "Steps:\n1. Use /upload to send a .txt file and process /stop.\n"
         "2. I will process the links and download the content.\n\n"
         "Created by CR Choudhary."
     )
@@ -154,7 +154,7 @@ async def process_links(bot: Client, m: Message):
                 if response.status_code == 200:
                     with open(pdf_path, "wb") as pdf_file:
                         pdf_file.write(response.content)
-                    await bot.send_document(m.chat.id, pdf_path, caption=f"📄 PDF {count}: {caption}")
+                    await bot.send_document(m.chat.id, pdf_path, caption=f"📄 PDF {count}: {caption}, Join @targetallcourse")
                     os.remove(pdf_path)
                 else:
                     await m.reply_text(f"❌ Failed to download PDF {count}: {link}")
@@ -165,7 +165,7 @@ async def process_links(bot: Client, m: Message):
                 status, output = getstatusoutput(cmd)
 
                 if status == 0:
-                    await bot.send_video(m.chat.id, video_name, caption=f"🎥 Video: {caption}")
+                    await bot.send_video(m.chat.id, video_name, caption=f"🎥 Video: {caption},Join @targetallcourse")
                     os.remove(video_name)
                 else:
                     await m.reply_text(f"❌ Failed to download video {count}: {link}\nError: {output}")
@@ -183,5 +183,5 @@ async def process_links(bot: Client, m: Message):
 
 # Start the bot
 if __name__ == "__main__":
-    print("Bot is running...")
+    print("Bot is running deploy by cr choudhary...")
     bot.run()
