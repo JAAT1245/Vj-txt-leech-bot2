@@ -1,14 +1,12 @@
 import os
 import sys
-import asyncio
 import re
-from aiohttp import ClientSession
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from subprocess import getstatusoutput
-from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID  # Ensure these variables are in your vars.py
+from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID  # Make sure to define these in vars.py
 
-# Define the bot object
+# Define the bot
 bot = Client(
     "bot",
     api_id=API_ID,
@@ -39,7 +37,7 @@ async def download_video(url, name):
 async def start(bot: Client, m: Message):
     await m.reply_text(
         f"Hello {m.from_user.mention} 👋\n\n"
-        "I am a bot that can download links from your **.TXT** file and upload them to Telegram.\n\n"
+        "I am a bot that can download links from your **.TXT👀🗃️** file and upload them to Telegram credit 💳>>CR CHOUDHARY.\n\n"
         "Use /upload to start uploading or /stop to stop any ongoing task."
     )
 
@@ -61,7 +59,6 @@ async def upload(bot: Client, m: Message):
         with open(file_path, "r") as f:
             content = f.read()
         links = [line.strip() for line in content.split("\n") if line.strip()]
-        os.remove(file_path)
     except Exception as e:
         await m.reply_text(f"**Error reading the file:** {str(e)}")
         return
@@ -143,8 +140,16 @@ async def upload(bot: Client, m: Message):
     if thumb and os.path.exists(thumb):
         os.remove(thumb)
 
-    await bot.send_message(m.chat.id, "**Upload complete!**")
-    await bot.send_document(CHANNEL_ID, document=file_path, caption="Original .TXT file with the links.")
+    try:
+        # Sending the original text file to the channel
+        await bot.send_document(
+            CHANNEL_ID,
+            document=file_path,
+            caption="Here is the original **.txt** file with the links!"
+        )
+        await m.reply_text("**Upload complete! Your text file has been sent to the channel. ✅**")
+    except Exception as e:
+        await m.reply_text(f"Error sending the file to the channel: {str(e)}")
 
 # Run the bot
 bot.run()
