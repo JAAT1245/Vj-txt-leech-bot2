@@ -80,7 +80,9 @@ async def handle_start_index(bot: Client, m: Message):
 # Handle Resolution
 @bot.on_message(filters.text & filters.private)
 async def handle_resolution(bot: Client, m: Message):
+    # Check if the user is in the correct state
     if m.chat.id not in user_states or user_states[m.chat.id].get("state") != "waiting_for_resolution":
+        await m.reply_text("You are not in the right state to provide resolution. Please start with /upload.")
         return
 
     res_map = {
@@ -97,12 +99,13 @@ async def handle_resolution(bot: Client, m: Message):
         await m.reply_text("Invalid resolution. Please enter one of: 144, 240, 360, 480, 720, 1080.")
         return
 
+    # Update the state and set the resolution
     user_states[m.chat.id].update({
         "state": "waiting_for_caption",
         "resolution": resolution
     })
-    await m.reply_text("Enter a caption for your uploaded files:")
-
+    print(user_states)  # Debugging step
+    await m.reply_text("Resolution accepted. Enter a caption for your uploaded files:")
 # Handle Caption
 @bot.on_message(filters.text & filters.private)
 async def handle_caption(bot: Client, m: Message):
@@ -121,7 +124,7 @@ async def handle_caption(bot: Client, m: Message):
 async def process_links(bot: Client, m: Message):
     state = user_states[m.chat.id]
     file_path = state["file_path"]
-    start_index = state["start_index"]
+    start_]
     resolution = state["resolution"]
     caption = state["caption"]
 
