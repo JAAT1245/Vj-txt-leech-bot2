@@ -3,7 +3,7 @@ import re
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from subprocess import getstatusoutput
-from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID  # Define these in vars.py
+from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID
 
 # Define the bot
 bot = Client(
@@ -25,8 +25,9 @@ user_data = {}
 async def start(bot: Client, m: Message):
     await m.reply_text(
         f"Hello {m.from_user.mention} 👋\n\n"
-        "I am a bot that can process links from your `.TXT` file and upload them to Telegram.\n\n"
-        "Use /upload to start uploading or /stop to stop any ongoing task."
+        "I am a bot that processes `.TXT` files containing links and uploads their content to Telegram.\n\n"
+        "Use /upload to begin or /stop to stop any ongoing task. \n\n"
+        "BOT 💌😉 Deploy by cr choudhary FOR UPDATES JOIN @Targetallcourse."
     )
 
 # Command: /stop
@@ -38,7 +39,7 @@ async def stop(bot: Client, m: Message):
 # Command: /upload
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
-    await m.reply_text("Send a `.TXT` file containing the download links.")
+    await m.reply_text("Please send a `.TXT` file containing the download links.")
 
 # Handling .txt file upload
 @bot.on_message(filters.document)
@@ -50,7 +51,10 @@ async def handle_document(bot: Client, m: Message):
                 content = f.read()
             links = [line.strip() for line in content.split("\n") if line.strip()]
             user_data[m.chat.id] = {"links": links, "file_path": file_path}
-            await m.reply_text(f"**Total links found:** {len(links)}\n\nSend the starting number (default is 1):")
+            await m.reply_text(
+                f"**Total links found:** {len(links)}\n\n"
+                "Send the starting number (default is 1):"
+            )
         except Exception as e:
             await m.reply_text(f"**Error reading the file:** {str(e)}")
     else:
