@@ -1,5 +1,7 @@
 import os
 import re
+import sys
+import time
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from subprocess import getstatusoutput
@@ -34,7 +36,7 @@ async def start(bot: Client, m: Message):
 @bot.on_message(filters.command("stop"))
 async def stop(bot: Client, m: Message):
     await m.reply_text("**Stopped** 🚦", True)
-    os.execl(sys.executable, sys.executable, *sys.argv)
+    sys.exit()  # Gracefully terminate the bot
 
 # Command: /upload
 @bot.on_message(filters.command(["upload"]))
@@ -90,7 +92,7 @@ async def handle_input(bot: Client, m: Message):
         await m.reply_text("Send the thumbnail URL or type 'no' to skip:")
     elif "thumb" not in data:
         thumb_url = m.text.strip()
-        if thumb_url.startswith("http"):
+        if thumb_url != 'no' and thumb_url.startswith("http"):
             getstatusoutput(f"wget '{thumb_url}' -O 'thumb.jpg'")
             data["thumb"] = "thumb.jpg"
         else:
@@ -164,6 +166,11 @@ async def process_links(bot: Client, m: Message):
         await m.reply_text(f"Error sending the file to the channel: {str(e)}")
 
     del user_data[chat_id]
+
+async def download_video(url, file_name):
+    # This is a placeholder for downloading the video file
+    # Implement the video downloading logic here
+    return file_name
 
 # Run the bot
 bot.run()
