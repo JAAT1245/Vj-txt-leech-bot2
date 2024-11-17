@@ -1,11 +1,40 @@
 import os
-import re
+import sys
+import time
+import asyncio
+import requests
 from pyrogram import Client, filters
 from pyrogram.types import Message
+from pyrogram.errors import FloodWait
+from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiohttp import ClientSession
+from subprocess import getstatusoutput
+from pyromod import listen
+from utils import progress_bar
+import core as helper
+from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID  # Make sure to add CHANNEL_ID here
 
-# Sanitize the filename to remove problematic characters
-def sanitize_filename(name: str):
-    return re.sub(r'[<>:"/\\|?*]', "", name)  # Removes problematic characters
+# Define the bot object first
+bot = Client(
+    "bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN)
+
+
+# Now define your command handlers after defining the bot
+
+@bot.on_message(filters.command(["start"]))
+async def start(bot: Client, m: Message):
+    await m.reply_text(f"<b>Hello {m.from_user.mention} 👋\n\n I Am A Bot For Download Links From Your **.TXT** File And Then Upload That File On Telegram So Basically If You Want To Use Me First Send Me /upload Command And Then Follow Few Steps..\n\nUse /stop to stop any ongoing task.</b>")
+
+
+@bot.on_message(filters.command("stop"))
+async def stop(bot: Client, m: Message):
+    await m.reply_text("**Stopped** 🚦", True)
+    os.execl(sys.executable, sys.executable, *sys.argv)
+
 
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
@@ -149,4 +178,5 @@ async def upload(bot: Client, m: Message):
         await m.reply_text(f"Error sending the file to the channel: {str(e)}")
 
 
+# Now run the bot
 bot.run()
