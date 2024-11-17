@@ -48,7 +48,7 @@ async def set_caption(bot: Client, m: Message):
 async def set_thumbnail(bot: Client, m: Message):
     await m.reply_text("**Please send me an image to set as your thumbnail.**")
 
-    thumb_msg: Message = await bot.listen(m.chat.id)
+    thumb_msg: Message = await bot.wait_for_message(m.chat.id)  # Wait for the next message in the chat
     if thumb_msg.photo:
         file_path = await thumb_msg.download()
         user_thumbnails[m.from_user.id] = file_path
@@ -63,7 +63,7 @@ async def upload(bot: Client, m: Message):
     thumbnail = user_thumbnails.get(m.from_user.id, None)
 
     editable = await m.reply_text('𝕤ᴇɴᴅ ᴛxᴛ ғɪʟᴇ ⚡️')
-    input: Message = await bot.listen(editable.chat.id)
+    input: Message = await bot.wait_for_message(editable.chat.id)  # Wait for the next message
     x = await input.download()
 
     try:
@@ -86,7 +86,7 @@ async def upload(bot: Client, m: Message):
         return
 
     await editable.edit(f"**𝕋ᴏᴛᴀʟ ʟɪɴᴋ𝕤 ғᴏᴜɴᴅ ᴀʀᴇ🔗🔗** **{len(links)}**\n\n**𝕊ᴇɴᴅ 𝔽ʀᴏᴍ ᴡʜᴇʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴɪᴛɪᴀʟ ɪ𝕤** **1**")
-    input0: Message = await bot.listen(editable.chat.id)
+    input0: Message = await bot.wait_for_message(editable.chat.id)  # Wait for the number of links
     raw_text = input0.text
     await input0.delete(True)
 
