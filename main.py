@@ -17,7 +17,7 @@ bot = Client(
     bot_token=BOT_TOKEN,
 )
 
-FORWARD_CHANNEL = -1001234567890  # Replace with your channel ID
+FORWARD_CHANNEL = -1002404864606  # Replace with your channel ID
 
 
 @bot.on_message(filters.command(["start"]))
