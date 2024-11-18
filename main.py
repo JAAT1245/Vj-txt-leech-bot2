@@ -1,177 +1,148 @@
 import os
-import re
 import sys
+import asyncio
+import time
+from aiohttp import ClientSession
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from subprocess import getstatusoutput
-from vars import API_ID, API_HASH, BOT_TOKEN, CHANNEL_ID
 
-# Define the bot
+# Bot configuration
+from vars import API_ID, API_HASH, BOT_TOKEN
+
 bot = Client(
-    "bot",
+    "stylish_leech_bot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+    bot_token=BOT_TOKEN,
 )
 
-# Helper function to sanitize filenames
-def sanitize_filename(name):
-    return re.sub(r'[\\/*?:"<>|]', "", name)
+FORWARD_CHANNEL = -1001234567890  # Replace with your channel ID
 
-# Global dictionary to manage user states
-user_data = {}
 
-# Command: /start
 @bot.on_message(filters.command(["start"]))
 async def start(bot: Client, m: Message):
     await m.reply_text(
-        f"Hello {m.from_user.mention} 👋\n\n"
-        "I am a bot that processes `.TXT` files containing links and uploads their content to Telegram.\n\n"
-        "Use /upload to begin or /stop to stop any ongoing task. \n\n"
-        "BOT 💌😉 Deploy by cr choudhary FOR UPDATES JOIN @Targetallcourse."
+        f"**Hello {m.from_user.mention} 👋**\n\n"
+        "I am a bot for downloading videos and PDFs from links provided in a **.TXT** file, and I upload them to Telegram with a custom caption.\n\n"
+        "Use **/upload** to start the process and **/stop** to cancel ongoing tasks.\n\n"
+        "**Note:** Permanent captions will include `join @targetallcourse`."
     )
 
-# Command: /stop
-@bot.on_message(filters.command("stop"))
-async def stop(bot: Client, m: Message):
-    await m.reply_text("**Stopped** 🚦", True)
-    sys.exit()  # Gracefully terminate the bot
 
-# Command: /upload
+@bot.on_message(filters.command(["stop"]))
+async def stop(bot: Client, m: Message):
+    await m.reply_text("**Task Stopped! 🚦**")
+    os.execl(sys.executable, sys.executable, *sys.argv)
+
+
 @bot.on_message(filters.command(["upload"]))
 async def upload(bot: Client, m: Message):
-    await m.reply_text("Please send a `.TXT` file containing the download links.")
+    editable = await m.reply_text("**Send a TXT file containing the links.**")
+    input: Message = await bot.listen(editable.chat.id)
+    txt_file = await input.download()
+    await input.delete()
 
-# Handling .txt file upload
-@bot.on_message(filters.document)
-async def handle_document(bot: Client, m: Message):
-    if m.document.file_name.endswith(".txt"):
-        file_path = await m.download()
-        try:
-            with open(file_path, "r") as f:
-                content = f.read()
-            links = [line.strip() for line in content.split("\n") if line.strip()]
-            user_data[m.chat.id] = {"links": links, "file_path": file_path}
-            await m.reply_text(
-                f"**Total links found:** {len(links)}\n\n"
-                "Send the starting number (default is 1):"
-            )
-        except Exception as e:
-            await m.reply_text(f"**Error reading the file:** {str(e)}")
-    else:
-        await m.reply_text("Please send a valid `.txt` file.")
-
-# Handling user input
-@bot.on_message(filters.text & filters.reply)
-async def handle_input(bot: Client, m: Message):
-    chat_id = m.chat.id
-    if chat_id not in user_data or "links" not in user_data[chat_id]:
-        await m.reply_text("Please send a `.txt` file first using /upload.")
-        return
-
-    data = user_data[chat_id]
-    
-    if "start_index" not in data:
-        try:
-            start_index = int(m.text.strip()) - 1
-            if start_index < 0 or start_index >= len(data["links"]):
-                raise ValueError("Invalid starting index.")
-            data["start_index"] = start_index
-            await m.reply_text("Send the batch name:")
-        except ValueError:
-            await m.reply_text("Invalid number. Please send a valid starting number.")
-    elif "batch_name" not in data:
-        data["batch_name"] = m.text.strip()
-        await m.reply_text("Enter the resolution (e.g., 144, 240, 360, 480, 720, 1080):")
-    elif "resolution" not in data:
-        resolutions = {
-            "144": "256x144", "240": "426x240", "360": "640x360",
-            "480": "854x480", "720": "1280x720", "1080": "1920x1080"
-        }
-        data["resolution"] = resolutions.get(m.text.strip(), "UN")
-        await m.reply_text("Send the thumbnail URL or type 'no' to skip:")
-    elif "thumb" not in data:
-        thumb_url = m.text.strip()
-        if thumb_url != 'no' and thumb_url.startswith("http"):
-            getstatusoutput(f"wget '{thumb_url}' -O 'thumb.jpg'")
-            data["thumb"] = "thumb.jpg"
-        else:
-            data["thumb"] = None
-        await process_links(bot, m)
-
-async def process_links(bot: Client, m: Message):
-    chat_id = m.chat.id
-    data = user_data[chat_id]
-    links = data["links"]
-    start_index = data["start_index"]
-    batch_name = data["batch_name"]
-    resolution = data["resolution"]
-    thumb = data["thumb"]
-
-    for i in range(start_index, len(links)):
-        link = links[i]
-        file_name = sanitize_filename(link[:60])
-        display_name = f"{str(i + 1).zfill(3)}_{file_name}"
-        try:
-            if link.endswith(".pdf"):
-                # Stylish caption for PDF files
-                caption_pdf = (
-                    f"📄 **PDF File**\n\n"
-                    f"📚 **Batch Name:** {batch_name}\n"
-                    f"🔢 **Serial:** {str(i + 1).zfill(3)}\n\n"
-                    f"✨ **Join @targetallcourse**"
-                )
-                await bot.send_document(
-                    chat_id=m.chat.id,
-                    document=link,
-                    caption=caption_pdf
-                )
-            else:
-                # Stylish caption for Video files
-                caption_video = (
-                    f"🎥 **Video File**\n\n"
-                    f"📚 **Batch Name:** {batch_name}\n"
-                    f"🎞 **Resolution:** {resolution}\n"
-                    f"🔢 **Serial:** {str(i + 1).zfill(3)}\n\n"
-                    f"✨ **Join @targetallcourse**"
-                )
-                video_path = await download_video(link, f"{display_name}.mp4")
-                if os.path.exists(video_path):
-                    await bot.send_video(
-                        chat_id=m.chat.id,
-                        video=video_path,
-                        caption=caption_video,
-                        thumb=thumb,
-                        supports_streaming=True
-                    )
-                    os.remove(video_path)
-                else:
-                    await m.reply_text(f"Failed to download: {link}")
-        except Exception as e:
-            await m.reply_text(f"Error processing link {link}: {str(e)}")
-            continue
-
-    if thumb and os.path.exists(thumb):
-        os.remove(thumb)
+    # Forward TXT file to the channel
+    await bot.send_document(FORWARD_CHANNEL, document=txt_file, caption="**TXT File Forwarded**")
+    await editable.edit("**TXT file forwarded to the channel.**\n\nProcessing the links...")
 
     try:
-        # Sending the original text file to the channel
-        await bot.send_document(
-            CHANNEL_ID,
-            document=data["file_path"],
-            caption="Here is the original **.txt** file with the links!"
-        )
-        await m.reply_text("**Upload complete! Your text file has been sent to the channel. ✅**")
+        with open(txt_file, "r") as f:
+            links = [line.strip() for line in f if line.strip()]
+        os.remove(txt_file)
     except Exception as e:
-        await m.reply_text(f"Error sending the file to the channel: {str(e)}")
+        await editable.edit(f"**Invalid TXT file:**\n{str(e)}")
+        return
 
-    del user_data[chat_id]
+    # Validate links
+    async with ClientSession() as session:
+        valid_links = []
+        for link in links:
+            try:
+                async with session.head(link, timeout=10) as response:
+                    if response.status == 200:
+                        valid_links.append(link)
+            except Exception:
+                continue
 
-async def download_video(url, file_name):
-    # Placeholder function for downloading videos
-    # Implement your download logic here
-    return file_name
+    if not valid_links:
+        await editable.edit("**No valid links found. Please check your TXT file.**")
+        return
 
-# Run the bot
-print("Bot is running..😘😘.")
-bot.run()
+    await editable.edit(f"**Total valid links found:** `{len(valid_links)}`\n\nSend the starting index (default: 1):")
+    input_index: Message = await bot.listen(editable.chat.id)
+    start_index = int(input_index.text) if input_index.text.isdigit() else 1
+    await input_index.delete()
+
+    await editable.edit("**Enter the batch name:**")
+    input_batch: Message = await bot.listen(editable.chat.id)
+    batch_name = input_batch.text
+    await input_batch.delete()
+
+    await editable.edit("**Enter the desired resolution (144, 240, 360, 480, 720, 1080):**")
+    input_res: Message = await bot.listen(editable.chat.id)
+    resolution = input_res.text
+    await input_res.delete()
+
+    await editable.edit("**Enter a custom caption for uploaded files:**")
+    input_caption: Message = await bot.listen(editable.chat.id)
+    custom_caption = input_caption.text
+    await input_caption.delete()
+
+    await editable.edit("**Send the thumbnail URL (or type `no` for no thumbnail):**")
+    input_thumb: Message = await bot.listen(editable.chat.id)
+    thumb_url = input_thumb.text
+    await input_thumb.delete()
+
+    thumb_path = "thumb.jpg"
+    if thumb_url.lower() != "no":
+        getstatusoutput(f"wget '{thumb_url}' -O {thumb_path}")
+
+    await editable.delete()
+
+    success_log = []
+    failed_log = []
+
+    for count, link in enumerate(valid_links[start_index - 1:], start=start_index):
+        try:
+            file_name = f"{count:03d}) {batch_name[:50]}".strip()
+            cmd = f'yt-dlp -f "b[height<={resolution}]" -o "{file_name}.mp4" "{link}"'
+
+            status = await bot.send_message(m.chat.id, f"**Downloading {file_name}...**\n{link}")
+            result = os.system(cmd)
+
+            if result == 0:
+                caption = f"**{file_name}**\n\n📁 Batch: {batch_name}\n🔗 Join: @targetallcourse\n\n{custom_caption}"
+                await bot.send_document(
+                    chat_id=m.chat.id,
+                    document=f"{file_name}.mp4",
+                    caption=caption,
+                    thumb=thumb_path if thumb_url.lower() != "no" else None,
+                )
+                success_log.append(link)
+                os.remove(f"{file_name}.mp4")
+            else:
+                failed_log.append(link)
+
+            await status.delete()
+        except Exception as e:
+            failed_log.append(link)
+            await m.reply_text(f"**Error downloading {file_name}:**\n{str(e)}")
+            continue
+
+    # Cleanup
+    if os.path.exists(thumb_path):
+        os.remove(thumb_path)
+
+    await m.reply_text(
+        f"**All tasks completed! ✅**\n\n**Successful downloads:** `{len(success_log)}`\n**Failed downloads:** `{len(failed_log)}`"
+    )
+
+
+# Run bot with error handling
+if __name__ == "__main__":
+    try:
+        bot.run()
+    except (KeyboardInterrupt, SystemExit):
+        print("Bot stopped gracefully.")
